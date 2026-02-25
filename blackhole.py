@@ -218,6 +218,9 @@ def save_ppm(path: str, width: int, height: int, rgb: bytes) -> None:
 
 def run_gui(renderer: BlackHoleRenderer, fps: int) -> None:
     import tkinter as tk
+    import base64
+    import tempfile
+    import os
 
     cfg = renderer.cfg
     root = tk.Tk()
@@ -227,14 +230,25 @@ def run_gui(renderer: BlackHoleRenderer, fps: int) -> None:
 
     state = {"frame": 0, "img": None}
 
+    # One temp file path reused; Tk sometimes caches file reads,
+    # so we force refresh by changing the filename each frame.
+    tmp_dir = tempfile.gettempdir()
+
     def tick():
         t = state["frame"] / fps
         rgb = renderer.render_frame(t)
         ppm = to_ppm(cfg.width, cfg.height, rgb)
 
-        # robust transport to Tk
-        b64 = base64.b64encode(ppm).decode("ascii")
-        img = tk.PhotoImage(data=b64, format="PPM")
+        # Path A; base64 PPM in memory
+        try:
+            b64 = base64.b64encode(ppm).decode("ascii")
+            img = tk.PhotoImage(data=b64, format="PPM")
+        except tk.TclError:
+            # Path B; write file, then load file
+            path = os.path.join(tmp_dir, f"bh_frame_{state['frame']:06d}.ppm")
+            with open(path, "wb") as f:
+                f.write(ppm)
+            img = tk.PhotoImage(file=path)
 
         label.configure(image=img)
         state["img"] = img
