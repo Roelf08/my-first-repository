@@ -219,39 +219,28 @@ def save_ppm(path: str, width: int, height: int, rgb: bytes) -> None:
 def run_gui(renderer: BlackHoleRenderer, fps: int) -> None:
     import tkinter as tk
     import base64
-    import tempfile
-    import os
 
     cfg = renderer.cfg
     root = tk.Tk()
-    root.title("Black Hole 3D Plane Simulation (400x300)")
+    root.title("Black Hole 3D Plane Simulation")
     label = tk.Label(root)
     label.pack()
 
     state = {"frame": 0, "img": None}
-
-    # One temp file path reused; Tk sometimes caches file reads,
-    # so we force refresh by changing the filename each frame.
-    tmp_dir = tempfile.gettempdir()
 
     def tick():
         t = state["frame"] / fps
         rgb = renderer.render_frame(t)
         ppm = to_ppm(cfg.width, cfg.height, rgb)
 
-        # Path A; base64 PPM in memory
-        try:
-            b64 = base64.b64encode(ppm).decode("ascii")
-            img = tk.PhotoImage(data=b64, format="PPM")
-        except tk.TclError:
-            # Path B; write file, then load file
-            path = os.path.join(tmp_dir, f"bh_frame_{state['frame']:06d}.ppm")
-            with open(path, "wb") as f:
-                f.write(ppm)
-            img = tk.PhotoImage(file=path)
+        b64 = base64.b64encode(ppm).decode("ascii")
+        img = tk.PhotoImage(data=b64, format="PPM")
 
-        label.configure(image=img)
-        state["img"] = img
+        # Upscale for display only
+        img2 = img.zoom(2, 2)
+
+        label.configure(image=img2)
+        state["img"] = img2
         state["frame"] += 1
         root.after(int(1000 / fps), tick)
 
@@ -269,7 +258,7 @@ def main() -> None:
     )
     parser.add_argument("--width", type=int, default=400)
     parser.add_argument("--height", type=int, default=300)
-    parser.add_argument("--fps", type=int, default=18)
+    parser.add_argument("--fps", type=int, default=12)
     parser.add_argument("--frames", type=int, default=1)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--output", default="blackhole_frame.ppm")
